@@ -1,3 +1,6 @@
 # folders
 .vscode
 __pycache__
+
+# files
+debug.py

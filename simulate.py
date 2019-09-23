@@ -11,6 +11,7 @@ from sklearn.svm import SVC
 from sklearn.cross_validation import train_test_split
 from sklearn import metrics
 import numpy as np
+from functools import reduce
 seed(0)
 
 def genRandom(min, max):
@@ -37,6 +38,12 @@ def rollInitative(listOfCreatures):
     for creature in listOfCreatures:
         creature['rolledInitative'] = roll1d20()
 
+def fight(attacker, defender):
+        attack = roll1d20()
+        if attack > defender.armorClass:
+            defender.hitPoints = defender.hitPoints - attacker.damage
+    return defender
+
 def battle(character, monster):
     turn = 0
     while (character.hitPoints > 0) & (monster.hitPoints > 0):
@@ -55,13 +62,95 @@ def battle(character, monster):
         survival = 0
     return character, monster, survival
 
-def simulateBattle(battles, nCharacters, nMonsters, plot):
+def simulateBattle(battles, nCharacters, nMonsterRange, plot):
     # monte carlo simulation
     df = pd.DataFrame()
     for i in range(0, battles):
         difficulty = genRandom(1, 5)
-        monster = classes.Monster(difficulty, 3)
-        character = classes.Character('elf', 'druid', 1)
+        nMonsters = int(genRandom(nMonsterRange[0], nMonsterRange[1]) + 0.5)
+        monsters = {}
+        for m in range(nMonsters):
+            monster = classes.Monster(difficulty, 3)
+            monsters.update({str(m): monster})
+        try:
+            len(characters)
+        except:
+            characters = {}
+            for c in range(nCharacters):
+                character = classes.Character('elf', 'druid', 1)
+                characters.update({str(c): character})
+        # determine turns
+        monsterInit = [monsters[x].initiative for x in monsters]
+        charInit = [characters[x].initiative for x in characters]
+        allInit = sorted(monsterInit + charInit, reverse=True)
+        # order = [x[0] for x in enumerate(allInit)]
+        allBattlingClasses = {}
+        for stat in enumerate(allInit):
+            # handles initative ties at random
+            assignFactor = int(genRandom(0, 1) + 0.5)
+            if assignFactor == 1:
+                if stat[1] in charInit:
+                    idx = charInit.index(stat[1])
+                    characters[str(idx)].order = stat[0]
+                    allBattlingClasses.update({str(stat[0]): characters[str(idx)]})
+                else:
+                    idx = monsterInit.index(stat[1])
+                    monsters[str(idx)].order = stat[0]
+                    allBattlingClasses.update({str(stat[0]): monsters[str(idx)]})
+            else:
+                if stat[1] in monsterInit:
+                    idx = monsterInit.index(stat[1])
+                    monsters[str(idx)].order = stat[0]
+                    allBattlingClasses.update({str(stat[0]): monsters[str(idx)]})
+                else:
+                    idx = charInit.index(stat[1])
+                    characters[str(idx)].order = stat[0]
+                    allBattlingClasses.update({str(stat[0]): characters[str(idx)]})
+
+        isCharacter = list(map(lambda x: isinstance(allBattlingClasses[x], classes.Character), allBattlingClasses))
+        dfBattle = pd.DataFrame()
+        while (sum([allBattlingClasses[x].hitPoints for x in allBattlingClasses if isinstance(allBattlingClasses[x], classes.Monster)]) > 0) & (sum([allBattlingClasses[x].hitPoints for x in allBattlingClasses if isinstance(allBattlingClasses[x], classes.Character)]) > 0):
+            for creature in enumerate(allBattlingClasses):
+                if isCharacter[creature[0]]:
+                    livingMonsters = list(map(lambda x: (isinstance(allBattlingClasses[x], classes.Monster)) & (allBattlingClasses[x].hitPoints > 0), allBattlingClasses))
+                    idxDefender = int(genRandom(1, sum(livingMonsters)) + 0.5)
+                    idxTemp = []
+                    idxAdditive = 1
+                    for m in livingMonsters:
+                        if m:
+                            idxTemp.append(idxAdditive)
+                            idxAdditive += 1
+                        else: 
+                            idxTemp.append(-1)
+                    allBattlingClasses[str(idxTemp.index(idxDefender))] = fight(allBattlingClasses[str(creature[0])], allBattlingClasses[str(idxTemp.index(idxDefender))])
+                    livingMonsters = list(map(lambda x: (isinstance(allBattlingClasses[x], classes.Monster)) & (allBattlingClasses[x].hitPoints > 0), allBattlingClasses))
+                    idxDefender = int(genRandom(1, sum(livingMonsters)) + 0.5)
+                    idxTemp = []
+                    idxAdditive = 1
+                    for m in livingMonsters:
+                        if m:
+                            idxTemp.append(idxAdditive)
+                            idxAdditive += 1
+                        else: 
+                            idxTemp.append(-1)
+                    allBattlingClasses[str(idxTemp.index(idxDefender))] = fight(allBattlingClasses[str(creature[0])], allBattlingClasses[str(idxTemp.index(idxDefender))])
+                else:
+                    livingCharacters = list(map(lambda x: (isinstance(allBattlingClasses[x], classes.Character)) & (allBattlingClasses[x].hitPoints > 0), allBattlingClasses))
+                    idxDefender = int(genRandom(1, sum(livingCharacters)) + 0.5)
+                    idxTemp = []
+                    idxAdditive = 1
+                    for c in livingCharacters:
+                        if c:
+                            idxTemp.append(idxAdditive)
+                            idxAdditive += 1
+                        else: 
+                            idxTemp.append(-1)
+                    allBattlingClasses[str(idxTemp.index(idxDefender))] = fight(allBattlingClasses[str(creature[0])], allBattlingClasses[str(idxTemp.index(idxDefender))])
+            dfBattle = dfBattle.append([[nMonsters]])
+        livingCharacters = list(map(lambda x: (isinstance(allBattlingClasses[x], classes.Character)) & (allBattlingClasses[x].hitPoints > 0), allBattlingClasses))
+        dict(map(lambda x: allBattlingClasses[x[1]] if livingCharacters[x[0]], enumerate(allBattlingClasses)))
+        characters = [allBattlingClasses[x[1]] for x in enumerate(allBattlingClasses) if livingCharacters[x[0]]]
+
         postCharacter, postMonster, survival = battle(character, monster)
         df = df.append([[difficulty, nCharacters, nMonsters, survival]])
     df.columns = ['difficulty', 'nCharacters', 'nMonsters', 'survival']
