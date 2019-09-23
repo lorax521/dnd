@@ -8,7 +8,10 @@ import pandas as pd
 import seaborn as sns
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
-from sklearn.cross_validation import train_test_split
+try:
+    from sklearn.model_selection import train_test_split
+except:
+    from sklearn.cross_validation import train_test_split
 from sklearn import metrics
 import numpy as np
 from functools import reduce
@@ -63,28 +66,30 @@ def battle(character, monster):
     return character, monster, survival
 
 def simulateBattle(battles, nCharacters, nMonsterRange, plot):
-    # monte carlo simulation
-    df = pd.DataFrame()
-    for i in range(0, battles):
+    def createCharacters(nCharacters):
+        characters = {}
+        for c in range(nCharacters):
+            character = classes.Character('elf', 'druid', 1)
+            characters.update({str(c): character})
+        return characters
+
+    def createMonsters(nMonsterRange):
         difficulty = genRandom(1, 5)
         nMonsters = int(genRandom(nMonsterRange[0], nMonsterRange[1]) + 0.5)
         monsters = {}
         for m in range(nMonsters):
             monster = classes.Monster(difficulty, 3)
             monsters.update({str(m): monster})
-        try:
-            len(characters)
-        except:
-            characters = {}
-            for c in range(nCharacters):
-                character = classes.Character('elf', 'druid', 1)
-                characters.update({str(c): character})
+        return monsters
+
+    def initBattle(characters, monsters):
+        # line 14 and 27 having problems
         # determine turns
         monsterInit = [monsters[x].initiative for x in monsters]
         charInit = [characters[x].initiative for x in characters]
         allInit = sorted(monsterInit + charInit, reverse=True)
         # order = [x[0] for x in enumerate(allInit)]
-        allBattlingClasses = {}
+        battleParty = {}
         for stat in enumerate(allInit):
             # handles initative ties at random
             assignFactor = int(genRandom(0, 1) + 0.5)
@@ -92,67 +97,89 @@ def simulateBattle(battles, nCharacters, nMonsterRange, plot):
                 if stat[1] in charInit:
                     idx = charInit.index(stat[1])
                     characters[str(idx)].order = stat[0]
-                    allBattlingClasses.update({str(stat[0]): characters[str(idx)]})
+                    battleParty.update({str(stat[0]): characters[str(idx)]})
                 else:
                     idx = monsterInit.index(stat[1])
                     monsters[str(idx)].order = stat[0]
-                    allBattlingClasses.update({str(stat[0]): monsters[str(idx)]})
+                    battleParty.update({str(stat[0]): monsters[str(idx)]})
             else:
                 if stat[1] in monsterInit:
                     idx = monsterInit.index(stat[1])
                     monsters[str(idx)].order = stat[0]
-                    allBattlingClasses.update({str(stat[0]): monsters[str(idx)]})
+                    battleParty.update({str(stat[0]): monsters[str(idx)]})
                 else:
                     idx = charInit.index(stat[1])
                     characters[str(idx)].order = stat[0]
-                    allBattlingClasses.update({str(stat[0]): characters[str(idx)]})
+                    battleParty.update({str(stat[0]): characters[str(idx)]})
 
-        isCharacter = list(map(lambda x: isinstance(allBattlingClasses[x], classes.Character), allBattlingClasses))
-        dfBattle = pd.DataFrame()
-        while (sum([allBattlingClasses[x].hitPoints for x in allBattlingClasses if isinstance(allBattlingClasses[x], classes.Monster)]) > 0) & (sum([allBattlingClasses[x].hitPoints for x in allBattlingClasses if isinstance(allBattlingClasses[x], classes.Character)]) > 0):
-            for creature in enumerate(allBattlingClasses):
-                if isCharacter[creature[0]]:
-                    livingMonsters = list(map(lambda x: (isinstance(allBattlingClasses[x], classes.Monster)) & (allBattlingClasses[x].hitPoints > 0), allBattlingClasses))
-                    idxDefender = int(genRandom(1, sum(livingMonsters)) + 0.5)
-                    idxTemp = []
-                    idxAdditive = 1
-                    for m in livingMonsters:
-                        if m:
-                            idxTemp.append(idxAdditive)
-                            idxAdditive += 1
-                        else: 
-                            idxTemp.append(-1)
-                    allBattlingClasses[str(idxTemp.index(idxDefender))] = fight(allBattlingClasses[str(creature[0])], allBattlingClasses[str(idxTemp.index(idxDefender))])
-                    livingMonsters = list(map(lambda x: (isinstance(allBattlingClasses[x], classes.Monster)) & (allBattlingClasses[x].hitPoints > 0), allBattlingClasses))
-                    idxDefender = int(genRandom(1, sum(livingMonsters)) + 0.5)
-                    idxTemp = []
-                    idxAdditive = 1
-                    for m in livingMonsters:
-                        if m:
-                            idxTemp.append(idxAdditive)
-                            idxAdditive += 1
-                        else: 
-                            idxTemp.append(-1)
-                    allBattlingClasses[str(idxTemp.index(idxDefender))] = fight(allBattlingClasses[str(creature[0])], allBattlingClasses[str(idxTemp.index(idxDefender))])
-                else:
-                    livingCharacters = list(map(lambda x: (isinstance(allBattlingClasses[x], classes.Character)) & (allBattlingClasses[x].hitPoints > 0), allBattlingClasses))
-                    idxDefender = int(genRandom(1, sum(livingCharacters)) + 0.5)
-                    idxTemp = []
-                    idxAdditive = 1
-                    for c in livingCharacters:
-                        if c:
-                            idxTemp.append(idxAdditive)
-                            idxAdditive += 1
-                        else: 
-                            idxTemp.append(-1)
-                    allBattlingClasses[str(idxTemp.index(idxDefender))] = fight(allBattlingClasses[str(creature[0])], allBattlingClasses[str(idxTemp.index(idxDefender))])
-            dfBattle = dfBattle.append([[nMonsters]])
-        livingCharacters = list(map(lambda x: (isinstance(allBattlingClasses[x], classes.Character)) & (allBattlingClasses[x].hitPoints > 0), allBattlingClasses))
-        dict(map(lambda x: allBattlingClasses[x[1]] if livingCharacters[x[0]], enumerate(allBattlingClasses)))
-        characters = [allBattlingClasses[x[1]] for x in enumerate(allBattlingClasses) if livingCharacters[x[0]]]
+        isCharacter = list(map(lambda x: isinstance(battleParty[x], classes.Character), battleParty))
+        return battleParty, isCharacter
 
-        postCharacter, postMonster, survival = battle(character, monster)
-        df = df.append([[difficulty, nCharacters, nMonsters, survival]])
+    def determineDefender(partyClass):
+        # partyClass = classes.Character if isinstance(party['0'], classes.Character) else classes.Monster
+        livingParty = list(map(lambda x: (isinstance(battleParty[x], partyClass)) & (battleParty[x].hitPoints > 0), battleParty))
+        idxDefender = int(genRandom(1, sum(livingParty)) + 0.5)
+        idxTemp = []
+        idxAdditive = 1
+        for m in livingParty:
+            if m:
+                idxTemp.append(idxAdditive)
+                idxAdditive += 1
+            else: 
+                idxTemp.append(-1)
+        defender = idxTemp.index(idxDefender)
+        return defender
+
+    def fight(attacker, defender):
+        attack = roll1d20()
+        if attack > defender.armorClass:
+            defender.hitPoints = defender.hitPoints - attacker.damage
+        return defender
+
+    def checkWin(battleParty):
+        livingCharacters = sum(list(map(lambda x: (isinstance(battleParty[x], classes.Character)) & (battleParty[x].hitPoints > 0), battleParty)))
+        livingMonsters = sum(list(map(lambda x: (isinstance(battleParty[x], classes.Monster)) & (battleParty[x].hitPoints > 0), battleParty)))
+        check = True if (livingCharacters > 0) & (livingMonsters > 0) else False
+        return check
+
+    def battle(battleParty, isCharacter):
+        # df for recording results
+        df = pd.DataFrame()
+        # while either party still has hitpoints
+        # while (sum([battleParty[x].hitPoints for x in battleParty if isinstance(battleParty[x], classes.Monster)]) > 0) & (sum([battleParty[x].hitPoints for x in battleParty if isinstance(battleParty[x], classes.Character)]) > 0):
+        while checkWin(battleParty):
+            # goes through turns by initiative
+            for member in enumerate(battleParty):
+                if checkWin(battleParty):
+                    # checks if member is a character
+                    if isCharacter[member[0]]:
+                        # determines the defender
+                        idxDefender = determineDefender(classes.Monster)
+                        # intitates attack and resets defender hit points
+                        battleParty[str(idxDefender)] = fight(battleParty[member[1]], battleParty[str(idxDefender)])
+                    else:
+                        # determines the defender
+                        idxDefender = determineDefender(classes.Character)
+                        # intitates attack and resets defender hit points
+                        battleParty[str(idxDefender)] = fight(battleParty[member[1]], battleParty[str(idxDefender)])
+        survival = int(sum(list(map(lambda x: (isinstance(battleParty[x], classes.Character)) & (battleParty[x].hitPoints > 0), battleParty))) > 0)
+        returnCharacters = {}
+        battleCharacters = [returnCharacters.update({str(int(x) - 1): battleParty[x]}) for x in battleParty if isinstance(battleParty[x], classes.Character)]
+        print(survival)
+        return survival, returnCharacters
+
+    # monte carlo simulation
+    df = pd.DataFrame()
+    def simulate():
+        wins = []
+        alive = 1
+        characters = createCharacters(nCharacters)
+        while alive:
+            monsters = createMonsters(nMonsterRange)
+            battleParty, isCharacter = initBattle(characters, monsters)
+            alive, characters = battle(battleParty, isCharacter)
+            wins.append(alive)
+        return wins
     df.columns = ['difficulty', 'nCharacters', 'nMonsters', 'survival']
 
     # SVM
