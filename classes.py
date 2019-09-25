@@ -23,6 +23,7 @@ class Base:
 
 
 class Monster(Base):
+    # TODO add attack method
     def __init__(self, difficulty, level):
         super().__init__()
         Base.damage = self.rollDamage(difficulty)
@@ -76,7 +77,9 @@ class Monster(Base):
         minValue = difficulty * 4
         self.initiative = int(genRandom(minValue, maxValue) + 0.5)
 
+
 class Character(Base):
+    # TODO add attack method
     def __init__(self, charRace, charClass, level):
         super().__init__()
         # ranges for stats by race and class
