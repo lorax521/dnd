@@ -1,6 +1,9 @@
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
-from sklearn.cross_validation import train_test_split
+try:
+    from sklearn.cross_validation import train_test_split
+except:
+    from sklearn.model_selection import train_test_split
 import numpy as np
 
 def plotModel(X, y, model):

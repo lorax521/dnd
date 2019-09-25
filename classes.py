@@ -18,17 +18,19 @@ class Base:
         }
         self.armorClass = 0
         self.hitPoints = 0
-        self.initiative = 0 
+        self.initiative = 0
+        self.order = 0
 
 
 class Monster(Base):
+    # TODO add attack method
     def __init__(self, difficulty, level):
         super().__init__()
         Base.damage = self.rollDamage(difficulty)
         Base.armorClass = self.rollArmorClass(difficulty)
         Base.hitPoints = self.rollHitPoints(difficulty)
         Base.stats = self.rollStats(difficulty)
-        Base.initative = self.rollInitiative(difficulty)
+        Base.initiative = self.rollInitiative(difficulty)
 
         # self.difficultyLevels = {
         #     'chump': 0,
@@ -73,11 +75,11 @@ class Monster(Base):
     def rollInitiative(self, difficulty):
         maxValue = difficulty * 6
         minValue = difficulty * 4
-        self.initative = int(genRandom(minValue, maxValue) + 0.5)
-        # return int(genRandom(minValue, maxValue) + 0.5)
+        self.initiative = int(genRandom(minValue, maxValue) + 0.5)
 
 
 class Character(Base):
+    # TODO add attack method
     def __init__(self, charRace, charClass, level):
         super().__init__()
         # ranges for stats by race and class

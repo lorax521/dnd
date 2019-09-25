@@ -2,15 +2,7 @@ from random import randint
 from random import seed
 from random import random
 import classes
-import visualize
-import generic
 import pandas as pd
-import seaborn as sns
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.svm import SVC
-from sklearn.cross_validation import train_test_split
-from sklearn import metrics
-import numpy as np
 seed(0)
 
 def genRandom(min, max):
@@ -37,69 +29,120 @@ def rollInitative(listOfCreatures):
     for creature in listOfCreatures:
         creature['rolledInitative'] = roll1d20()
 
-def battle(character, monster):
-    turn = 0
-    while (character.hitPoints > 0) & (monster.hitPoints > 0):
-        attack = roll1d20()
-        # address turn
-        if turn%2 == 0:
-            if attack > character.armorClass:
-                character.hitPoints = character.hitPoints - monster.damage
-        if turn%2 == 1:
-            if attack > monster.armorClass:
-                monster.hitPoints = monster.hitPoints - character.damage
-        turn += 1
-    if character.hitPoints > monster.hitPoints:
-        survival = 1
-    else:
-        survival = 0
-    return character, monster, survival
-
-def simulateBattle(battles, nCharacters, nMonsters, plot):
-    # monte carlo simulation
-    df = pd.DataFrame()
-    for i in range(0, battles):
-        difficulty = genRandom(1, 5)
-        monster = classes.Monster(difficulty, 3)
+def createCharacters(nCharacters):
+    characters = {}
+    for c in range(nCharacters):
         character = classes.Character('elf', 'druid', 1)
-        postCharacter, postMonster, survival = battle(character, monster)
-        df = df.append([[difficulty, nCharacters, nMonsters, survival]])
-    df.columns = ['difficulty', 'nCharacters', 'nMonsters', 'survival']
+        characters.update({str(c): character})
+    return characters
 
-    # SVM
-    y = df['survival'].values
-    # X = np.array([np.array(df['difficulty']), y]).T
-    X = np.array(df['difficulty'])
-    # Splitting the dataset into the Training set and Test set
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 0)
-    X_train = X_train.reshape(-1, 1)
-    X_test = X_test.reshape(-1, 1)
-    # fit classifier to the training set
-    model = SVC(gamma=2, C=1, probability=True)
-    model.fit(X_train, y_train)
+def createMonsters(nMonsterRange, difficulty):
+    # difficulty = genRandom(1, 5)
+    nMonsters = int(genRandom(nMonsterRange[0], nMonsterRange[1]) + 0.5)
+    monsters = {}
+    for m in range(nMonsters):
+        monster = classes.Monster(difficulty, 3)
+        monsters.update({str(m): monster})
+    return monsters
 
-    probs = model.predict_proba(X_test)
-    preds = probs[:,1]
-    fpr, tpr, threshold = metrics.roc_curve(y_test, preds)
-    roc_auc = metrics.auc(fpr, tpr)
-    print('ROC AUC: ' + str(roc_auc))
+def initBattle(characters, monsters):
+    try:
+        # determine turns
+        members =  [x for x in characters.values()] + [x for x in monsters.values()]
+        initiatives = [x.initiative for x in members]
+        initSorted = initiatives.copy()
+        initSorted.sort()
+        initNew = []
+        for number in (initSorted):
+            idx = initiatives.index(number)
+            initNew.append(idx)
+            initiatives[idx] = -1
+        reMember = []
+        for idx in initNew:
+            reMember.append(members[idx])
+        battleParty = {}
+        for member in enumerate(reMember):
+            battleParty.update({str(member[0]): member[1]})
+        isCharacter = list(map(lambda x: isinstance(battleParty[x], classes.Character), battleParty))
+        return battleParty, isCharacter
+    except ValueError as e:
+        print('---------- error ------------')
+        print(e)
 
-    if plot:
-        visualize.plotModel(X, y, model)
-    
-    return model, df, model.score(X_test, y_test)
+def determineDefender(battleParty, partyClass):
+    try:
+        # members of party class with hitpoints > 0
+        livingParty = list(map(lambda x: (isinstance(battleParty[x], partyClass)) & (battleParty[x].hitPoints > 0), battleParty))
+        # random idx of the livingParty where equals true
+        idxDefender = int(genRandom(1, sum(livingParty)) + 0.5) - 1
+        idxTemp = []
+        idxAdditive = 0
+        for m in livingParty:
+            if m:
+                idxTemp.append(idxAdditive)
+                idxAdditive += 1
+            else: 
+                idxTemp.append(-1)
+        defender = idxTemp.index(idxDefender)
+        return defender
+    except ValueError as e:
+        print('-------------- error -------------')
+        print(e)
 
-class BattleSuccess():
-    def __init__(self):
-        model, df, score = simulateBattle(100, 1, 1, False)
-        steps = np.linspace(1, 5, 1000)
-        self.df = pd.DataFrame()
-        for step in steps:
-            self.df = self.df.append([[step, model.predict_proba(step)[:,1][0]]])
-        self.df.columns = ['difficulty', 'probability']
+def fight(attacker, defender):
+    attack = roll1d20()
+    if attack > defender.armorClass:
+        defender.hitPoints = defender.hitPoints - attacker.damage
+    return defender
 
-    def predictDifficulty(self, value):
-        array = np.asarray(self.df['probability'])
-        idx = (np.abs(array - value)).argmin()
-        return self.df.iloc[idx]['difficulty']
+def battleActive(battleParty):
+    livingCharacters = sum(list(map(lambda x: (isinstance(battleParty[x], classes.Character)) & (battleParty[x].hitPoints > 0), battleParty)))
+    livingMonsters = sum(list(map(lambda x: (isinstance(battleParty[x], classes.Monster)) & (battleParty[x].hitPoints > 0), battleParty)))
+    check = True if (livingCharacters > 0) & (livingMonsters > 0) else False
+    return check
 
+def battle(battleParty, isCharacter):
+    try: 
+        # df for recording results
+        df = pd.DataFrame()
+        # while either party still has hitpoints
+        while battleActive(battleParty):
+            # goes through turns by initiative
+            for member in enumerate(battleParty):
+                if battleActive(battleParty):
+                    # checks if member is a character
+                    if isCharacter[member[0]]:
+                        # determines the defender
+                        idxDefender = determineDefender(battleParty, classes.Monster)
+                        # intitates attack and resets defender hit points
+                        battleParty[str(idxDefender)] = fight(battleParty[member[1]], battleParty[str(idxDefender)])
+                    else:
+                        # determines the defender
+                        idxDefender = determineDefender(battleParty, classes.Character)
+                        # intitates attack and resets defender hit points
+                        battleParty[str(idxDefender)] = fight(battleParty[member[1]], battleParty[str(idxDefender)])
+        survival = int(sum(list(map(lambda x: (isinstance(battleParty[x], classes.Character)) & (battleParty[x].hitPoints > 0), battleParty))) > 0)
+        returnCharacters = {}
+        charIdx = [x for x in battleParty if isinstance(battleParty[x], classes.Character)]
+        [returnCharacters.update({str(x[0]): battleParty[x[1]]}) for x in enumerate(charIdx)]
+        # battleCharacters = [returnCharacters.update({str(int(x) - 1): battleParty[x]}) for x in battleParty if isinstance(battleParty[x], classes.Character)]
+        return survival, returnCharacters
+    except ValueError as e:
+        print('---------- error ------------')
+        print(e)
+
+def simulate(nCharacters, nMonsterRange, difficulty):
+    try:
+        wins = 0
+        alive = 1
+        characters = createCharacters(nCharacters)
+        while alive:
+            monsters = createMonsters(nMonsterRange, difficulty)
+            battleParty, isCharacter = initBattle(characters, monsters)
+            alive, characters = battle(battleParty, isCharacter)
+            if alive:
+                wins += 1
+        return wins
+    except ValueError as e:
+        print('---------- error ------------')
+        print(e)
