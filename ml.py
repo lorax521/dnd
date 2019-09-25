@@ -114,3 +114,12 @@ plt.title('Support Vector Regression')
 plt.xlabel('difficulty (independent)')
 plt.ylabel('wins (dependent)')
 plt.show()
+
+
+"""
+
+def createMonsterGroups(characters, numberOfMonsters, sizeOfMonsterGroupRange, probabilityOfSuccess): or numberOfInteractions
+    return monsterGroups
+
+def createDungeon(numberOfRooms)
+
