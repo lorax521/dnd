@@ -91,6 +91,7 @@ def svm(df):
 # steps = np.linspace(1,5,100)
 # for step in steps:
 #     print(step, m.predict(step))
+# m.plot()
 
 class svrModel():
     def __init__(self, df):
@@ -149,12 +150,11 @@ class svrModel():
         # plt.scatter(X, y, color = 'red')
         plt.scatter(self.X, self.y, color = 'red')
         # plt.plot(X_grid, model.predict(X_grid), color = 'blue')
-        plt.plot(X_grid, self.sc_y.inverse_transform(self.sc_X.transform(self.model.predict(X_grid))), color = 'blue')
+        plt.plot(X_grid, [self.predict(x[0]) for x in X_grid], color = 'blue')
         plt.title('Support Vector Regression')
         plt.xlabel('difficulty (independent)')
         plt.ylabel('wins (dependent)')
         plt.show()
-
 
 """
 
